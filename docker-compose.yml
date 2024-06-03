@@ -120,28 +120,28 @@ services:
     container_name: homepage
     # ports:
     #   - 3000:3000
+    volumes:
+      - /services/config/homepage:/app/config:rw
     networks:
       internal_network:
         ipv4_address: 10.2.0.105
     security_opt:
       - no-new-privileges
-    volumes:
-      - /services/config/homepage:/app/config:rw
     restart: unless-stopped
     depends_on: 
       - cloudflare-ddns
-  # portainer:
-  #   image: portainer/portainer-ce:latest
-  #   container_name: portainer
-  #   # ports:
-  #   #   - 9000:9000
-  #   volumes:
-  #     - /services/data/portainer:/data
-  #   cap_add:
-  #     - NET_ADMIN
-  #   restart: unless-stopped
-  #   depends_on: 
-  #     - cloudflare-ddns
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    # ports:
+    #   - 9000:9000
+    volumes:
+      - /services/data/portainer:/data
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+    depends_on: 
+      - cloudflare-ddns
   nextcloud:
     image: lscr.io/linuxserver/nextcloud:latest
     container_name: nextcloud
@@ -162,21 +162,21 @@ services:
     restart: unless-stopped
     depends_on: 
       - cloudflare-ddns
-  # vaultwarden:
-  #   image: vaultwarden/server:latest
-  #   container_name: vaultwarden
-  #   environment:
-  #     - ADMIN_TOKEN=${ADMIN_TOKEN}
-  #     - WEBSOCKET_ENABLED=true
-  #     - SIGNUPS_ALLOWED=false
-  #     - DOMAIN=${DOMAIN}
-  #   # ports:
-  #   #  - 443:80
-  #   volumes:
-  #     - /services/data/vaultwarden:/data:rw
-  #   restart: unless-stopped
-  #   depends_on: 
-  #     - cloudflare-ddns
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    environment:
+      - ADMIN_TOKEN=${ADMIN_TOKEN}
+      - WEBSOCKET_ENABLED=true
+      - SIGNUPS_ALLOWED=false
+      - DOMAIN=${DOMAIN}
+    # ports:
+    #  - 443:80
+    volumes:
+      - /services/data/vaultwarden:/data:rw
+    restart: unless-stopped
+    depends_on: 
+      - cloudflare-ddns
   cloudflare-ddns:
     image: timothyjmiller/cloudflare-ddns:latest
     container_name: cloudflare-ddns
