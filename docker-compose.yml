@@ -8,7 +8,7 @@ services:
     volumes:
       - ./unbound:/opt/unbound/etc/unbound:rw 
     networks:
-      default:
+      homelab:
         ipv4_address: 10.2.0.100
     cap_add:
       - NET_ADMIN
@@ -37,6 +37,9 @@ services:
     volumes:
       - /services/data/wireguard-ui:/app/db:rw
       - /services/config/wireguard-ui:/config:rw
+    networks:
+      homelab:
+        ipv4_address: 10.2.0.101
     security_opt:
       - no-new-privileges
     restart: unless_stopped
@@ -49,7 +52,7 @@ services:
     container_name: wireguard
     environment:
       - WIREGUARD_PEERS: 1
-      - WIREGUARD_PEER_DNS: 10.2.0.102
+      - WIREGUARD_PEER_DNS: 10.2.0.100
       - WIREGUARD_SERVER_PORT: 51820
     ports:
       - 5000:5000
@@ -63,7 +66,7 @@ services:
     volumes:
       - /services/config/wireguard:/config:rw
     networks:
-      default:
+      homelab:
         ipv4_address: 10.2.0.102
     security_opt:
       - no-new-privileges
@@ -78,7 +81,6 @@ services:
     environment:
       - PIHOLE_IPV4_ADDRESS: 10.2.0.103
       - WEBPASSWORD: ${WEBPASSWORD}
-    hostname: pihole
     dns:
       - 10.2.0.100
     volumes:
@@ -87,7 +89,7 @@ services:
     cap_add:
       - NET_ADMIN
     networks:
-      default:
+      homelab:
         ipv4_address: 10.2.0.103
     security_opt:
       - no-new-privileges
@@ -109,7 +111,7 @@ services:
       - ./services/data/nginx-proxy-manager:/data:rw
       - ./services/config/letsencrypt:/etc/letsencrypt:rw
     networks:
-      default:
+      homelab:
         ipv4_address: 10.2.0.104
     security_opt:
       - no-new-privileges
@@ -125,7 +127,7 @@ services:
     volumes:
       - /services/config/homepage:/app/config:rw
     networks:
-      default:
+      homelab:
         ipv4_address: 10.2.0.105
     security_opt:
       - no-new-privileges
@@ -140,6 +142,9 @@ services:
     #   - 9000:9000
     volumes:
       - /services/data/portainer:/data
+    networks:
+      homelab:
+        ipv4_address: 10.2.0.106
     cap_add:
       - NET_ADMIN
     restart: unless-stopped
@@ -159,8 +164,8 @@ services:
       - /services/data/nextcloud:/data:rw
       - /services/config/nextcloud:/config:rw
     networks:
-      default:
-        ipv4_address: 10.2.0.106
+      homelab:
+        ipv4_address: 10.2.0.107
     security_opt:
       - no-new-privileges
     restart: unless-stopped
@@ -179,6 +184,9 @@ services:
     #  - 443:80
     volumes:
       - /services/data/vaultwarden:/data:rw
+    networks:
+      default:
+        ipv4_address: 10.2.0.108
     restart: unless-stopped
     depends_on: 
       - cloudflare-ddns
@@ -190,14 +198,14 @@ services:
       - no-new-privileges:true
     networks:
       default:
-        ipv4_address: 10.2.0.107
+        ipv4_address: 10.2.0.109
     restart: unless-stopped
     volumes:
       - /services/config/cloudflare-ddns/config.json:/config.json:rw
 
 networks:
-  default:
+  homelab:
     ipam:
-      driver: default
+      driver: bridged
       config:
         - subnet: 10.2.0.0/24
