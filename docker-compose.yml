@@ -1,19 +1,18 @@
-version: '3.8'
 services:
   unbound:
-    image: mvance/unbound:latest
+    image: mvance/unbound-rpi:latest
     container_name: unbound
     environment:
-      - UNBOUND_IPV4_ADDRESS: 10.2.0.100
+      - UNBOUND_IPV4_ADDRESS=10.2.0.100
     volumes:
-      - ./unbound:/opt/unbound/etc/unbound:rw 
+      - /services/config/unbound:/opt/unbound/etc/unbound:rw 
     networks:
       homelab:
         ipv4_address: 10.2.0.100
     cap_add:
       - NET_ADMIN
     security_opt:
-      - no-new-privileges
+      - no-new-privileges:true
     restart: unless-stopped
     depends_on:
       - cloudflare-ddns
@@ -22,14 +21,19 @@ services:
     image: ngoduykhanh/wireguard-ui:latest
     container_name: wireguard-ui
     environment:
-      - WGUI_SESSION_SECRET: VerYSsSs3cr3tLoL
-      - WGUI_USERNAME: admin
-      - WGUI_PASSWORD: ${WGUI_PASSWORD}
-      - WGUI_MANAGE_START: true
-      - WGUI_MANAGE_RESTART: true
+      - WGUI_SESSION_SECRET=VerYSsSs3cr3tLoL
+      - WGUI_USERNAME=admin
+      - WGUI_PASSWORD=${WGUI_PASSWORD}
+      - WGUI_MANAGE_START=true
+      - WGUI_MANAGE_RESTART=true
+      - WGUI_SERVER_INTERFACE_ADDRESSES=10.2.0.102
+      - WGUI_DNS=10.2.0.100
     cap_add:
       - NET_ADMIN
     network_mode: service:wireguard
+    # ports:
+      # - 51820:51820/udp
+      # - 8080:5000/tcp
     logging:
       driver: json-file
       options:
@@ -37,12 +41,12 @@ services:
     volumes:
       - /services/data/wireguard-ui:/app/db:rw
       - /services/config/wireguard-ui:/config:rw
-    networks:
-      homelab:
-        ipv4_address: 10.2.0.101
+    # networks:
+      # homelab:
+        # ipv4_address: 10.2.0.101
     security_opt:
-      - no-new-privileges
-    restart: unless_stopped
+      - no-new-privileges:true
+    restart: unless-stopped
     depends_on:
       - wireguard
       - cloudflare-ddns
@@ -51,32 +55,32 @@ services:
     image: linuxserver/wireguard
     container_name: wireguard
     environment:
-      - PUID: 1000
-      - PGID: 1000
-      - PEERS: 2
-      - SERVERURL: vpn.tur11ng.my.id
-      - SERVERPORT: 51820
-      - LOG_CONFS: true
-      - INTERNAL_SUBNET: 10.2.0.0
-      - ALLOWEDIPS: 10.2.0.0/24
-      - PEERDNS: 10.2.0.100
-      - ALLOWEDIPS: 
-      - LOG_CONFS: true
+      - TZ=Europe/Athens
+      - PUID=1000
+      - PGID=1000
+      - PEERS=2
+      - SERVERURL=10.2.0.102
+      - SERVERPORT=51820
+      - LOG_CONFS=tru
+      - INTERNAL_SUBNET=10.2.0.0
+      - ALLOWEDIPS=10.2.0.0/24
+      - PEERDNS=10.2.0.100
     ports:
       - 51820:51820/udp
+      - 8080:5000/tcp
     cap_add:
       - NET_ADMIN
-      - SYS_MODULE
+      # - SYS_MODULE
     sysctls:
-      - net.ipv4.conf.all.src_valid_mark: 1
-      - net.ipv4.ip_forward: 1
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv4.ip_forward=1
     volumes:
       - /services/config/wireguard:/config:rw
     networks:
       homelab:
         ipv4_address: 10.2.0.102
     security_opt:
-      - no-new-privileges
+      - no-new-privileges:true
     restart: unless-stopped
     depends_on:
       - unbound
@@ -86,8 +90,8 @@ services:
     container_name: pihole
     image: pihole/pihole:latest
     environment:
-      - PIHOLE_IPV4_ADDRESS: 10.2.0.103
-      - WEBPASSWORD: ${WEBPASSWORD}
+      - PIHOLE_IPV4_ADDRESS=10.2.0.103
+      - WEBPASSWORD=${WEBPASSWORD}
     dns:
       - 10.2.0.100
     volumes:
@@ -99,7 +103,7 @@ services:
       homelab:
         ipv4_address: 10.2.0.103
     security_opt:
-      - no-new-privileges
+      - no-new-privileges:true
     restart: unless-stopped
     depends_on:
       - cloudflare-ddns
@@ -109,19 +113,19 @@ services:
     image: 'jc21/nginx-proxy-manager:latest'
     container_name: nginx-proxy-manager
     environment:
-      - DISABLE_IPV6: true
+      - DISABLE_IPV6=true
     # ports:
     #   - '80:80'
     #   - '443:443'
     #   - '81:81'
     volumes:
-      - ./services/data/nginx-proxy-manager:/data:rw
-      - ./services/config/letsencrypt:/etc/letsencrypt:rw
+      - /services/data/nginx-proxy-manager:/data:rw
+      - /services/config/letsencrypt:/etc/letsencrypt:rw
     networks:
       homelab:
         ipv4_address: 10.2.0.104
     security_opt:
-      - no-new-privileges
+      - no-new-privileges:true
     restart: unless-stopped
     depends_on: 
       - cloudflare-ddns
@@ -137,7 +141,7 @@ services:
       homelab:
         ipv4_address: 10.2.0.105
     security_opt:
-      - no-new-privileges
+      - no-new-privileges:true
     restart: unless-stopped
     depends_on: 
       - cloudflare-ddns
@@ -192,7 +196,7 @@ services:
   #   volumes:
   #     - /services/data/vaultwarden:/data:rw
   #   networks:
-  #     default:
+  #     homelab:
   #       ipv4_address: 10.2.0.108
   #   restart: unless-stopped
   #   depends_on: 
@@ -204,7 +208,7 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      default:
+      homelab:
         ipv4_address: 10.2.0.109
     restart: unless-stopped
     volumes:
@@ -213,6 +217,5 @@ services:
 networks:
   homelab:
     ipam:
-      driver: bridged
       config:
         - subnet: 10.2.0.0/24
