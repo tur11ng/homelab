@@ -32,3 +32,9 @@
 ```
 docker run --name netshoot --rm -it nicolaka/netshoot /bin/bash
 ```
+
+## Status
+
+We cannot see traffic originating from the local host (attached with --network host the netshoot container and tried nmap) on the wireguard container on port 51820, but the scan completes fine, we also tried changing the interface.
+
+The port seems open from the public.
