@@ -42,8 +42,8 @@ services:
       - /services/data/wireguard-ui:/app/db:rw
       - /services/config/wireguard-ui:/config:rw
     # networks:
-      # homelab:
-        # ipv4_address: 10.2.0.101
+    #   homelab:
+    #     ipv4_address: 10.2.0.101
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
@@ -59,12 +59,13 @@ services:
       - PUID=1000
       - PGID=1000
       - PEERS=2
-      - SERVERURL=10.2.0.102
+      - SERVERURL=vpn.tur11ng.my.id
       - SERVERPORT=51820
-      - LOG_CONFS=tru
+      - LOG_CONFS=true
       - INTERNAL_SUBNET=10.2.0.0
-      - ALLOWEDIPS=10.2.0.0/24
+      - ALLOWEDIPS=0.0.0.0/0
       - PEERDNS=10.2.0.100
+      - PERSISTENTKEEPALIVE_PEERS=25
     ports:
       - 51820:51820/udp
       - 8080:5000/tcp
@@ -85,7 +86,7 @@ services:
     depends_on:
       - unbound
       - pihole
-
+  
   pihole:
     container_name: pihole
     image: pihole/pihole:latest
@@ -108,6 +109,50 @@ services:
     depends_on:
       - cloudflare-ddns
       - unbound
+
+  # openvpn:
+  #   image: kylemanna/openvpn
+  #   container_name: openvpn
+  #   ports:
+  #     - "1194:1194/udp"
+  #   volumes:
+  #    - /services/config/openvpn/:/etc/openvpn
+  #   cap_add:
+  #     - NET_ADMIN
+  #   sysctls:
+  #     - net.ipv4.conf.all.src_valid_mark=1
+  #     - net.ipv4.ip_forward=1
+  #   networks:
+  #     homelab:
+  #       ipv4_address: 10.2.0.102
+  #   security_opt:
+  #     - no-new-privileges:true
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - unbound
+  #     - pihole
+  # pihole:
+  #   container_name: pihole
+  #   image: pihole/pihole:latest
+  #   environment:
+  #     - PIHOLE_IPV4_ADDRESS=10.2.0.103
+  #     - WEBPASSWORD=${WEBPASSWORD}
+  #   dns:
+  #     - 10.2.0.100
+  #   volumes:
+  #     - /services/config/pihole:/etc/pihole:rw
+  #     - /services/config/dnsmasq:/etc/dnsmasq.d:rw
+  #   cap_add:
+  #     - NET_ADMIN
+  #   networks:
+  #     homelab:
+  #       ipv4_address: 10.2.0.103
+  #   security_opt:
+  #     - no-new-privileges:true
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - cloudflare-ddns
+  #     - unbound
 
   nginx-proxy-manager:
     image: 'jc21/nginx-proxy-manager:latest'
