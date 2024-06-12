@@ -17,23 +17,35 @@ services:
     depends_on:
       - cloudflare-ddns
 
+  wireguard:
+    image: linuxserver/wireguard:v1.0.20210914-ls7
+    container_name: wireguard
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - /services/config/wireguard:/config:rw
+    networks:
+      homelab:
+        ipv4_address: 10.2.0.101
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+      - "51820:51820/udp"
+
   wireguard-ui:
     image: ngoduykhanh/wireguard-ui:latest
     container_name: wireguard-ui
-    environment:
-      - WGUI_SESSION_SECRET=VerYSsSs3cr3tLoL
-      - WGUI_USERNAME=admin
-      - WGUI_PASSWORD=${WGUI_PASSWORD}
-      - WGUI_MANAGE_START=true
-      - WGUI_MANAGE_RESTART=true
-      - WGUI_SERVER_INTERFACE_ADDRESSES=10.2.0.102
-      - WGUI_DNS=10.2.0.100
     cap_add:
       - NET_ADMIN
     network_mode: service:wireguard
-    # ports:
-      # - 51820:51820/udp
-      # - 8080:5000/tcp
+    environment:
+      - SESSION_SECRET=VerYSsSs3cr3tLoL
+      - WGUI_USERNAME=admin
+      - WGUI_PASSWORD=${WGUI_PASSWORD}
+      - WG_CONF_TEMPLATE
+      - WGUI_MANAGE_START=true
+      - WGUI_MANAGE_RESTART=true
+      - WG_CONF_TEMPLATE
     logging:
       driver: json-file
       options:
@@ -41,51 +53,82 @@ services:
     volumes:
       - /services/data/wireguard-ui:/app/db:rw
       - /services/config/wireguard-ui:/config:rw
-    # networks:
-    #   homelab:
-    #     ipv4_address: 10.2.0.101
-    security_opt:
-      - no-new-privileges:true
-    restart: unless-stopped
     depends_on:
       - wireguard
-      - cloudflare-ddns
+      
 
-  wireguard:
-    image: linuxserver/wireguard
-    container_name: wireguard
-    environment:
-      - TZ=Europe/Athens
-      - PUID=1000
-      - PGID=1000
-      - PEERS=2
-      - SERVERURL=vpn.tur11ng.my.id
-      - SERVERPORT=51820
-      - LOG_CONFS=true
-      - INTERNAL_SUBNET=10.2.0.0
-      - ALLOWEDIPS=0.0.0.0/0
-      - PEERDNS=10.2.0.100
-      - PERSISTENTKEEPALIVE_PEERS=25
-    ports:
-      - 51820:51820/udp
-      - 8080:5000/tcp
-    cap_add:
-      - NET_ADMIN
-      # - SYS_MODULE
-    sysctls:
-      - net.ipv4.conf.all.src_valid_mark=1
-      - net.ipv4.ip_forward=1
-    volumes:
-      - /services/config/wireguard:/config:rw
-    networks:
-      homelab:
-        ipv4_address: 10.2.0.102
-    security_opt:
-      - no-new-privileges:true
-    restart: unless-stopped
-    depends_on:
-      - unbound
-      - pihole
+  # wireguard-ui:
+  #   image: ngoduykhanh/wireguard-ui:latest
+  #   container_name: wireguard-ui
+  #   environment:
+  #     - TZ=Europe/Athens
+  #     - WGUI_SESSION_SECRET=VerYSsSs3cr3tLoL
+  #     - WGUI_USERNAME=admin
+  #     - WGUI_MANAGE_START=true
+  #     - WGUI_MANAGE_RESTART=true
+  #     - WGUI_SERVER_INTERFACE_ADDRESSES=10.2.0.102
+  #     - WGUI_DNS=10.2.0.100
+  #     - WGUI_LOG_LEVEL=INFO
+  #     - WGUI_SERVER_POST_UP_SCRIPT=iptables -A FORWARD -i wg0 -j ACCEPT; iptables -A FORWARD -o wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o eth+ -j MASQUERADE
+  #     - WGUI_SERVER_POST_DOWN_SCRIPT=iptables -D FORWARD -i wg0 -j ACCEPT; iptables -D FORWARD -o wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o eth+ -j MASQUERADE
+  #   cap_add:
+  #     - NET_ADMIN
+  #   network_mode: service:wireguard
+  #   # ports:
+  #     # - 51820:51820/udp
+  #     # - 8080:5000/tcp
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: 50m
+  #   volumes:
+  #     - /services/data/wireguard-ui:/app/db:rw
+  #     - /services/config/wireguard-ui:/config:rw
+  #   # networks:
+  #   #   homelab:
+  #   #     ipv4_address: 10.2.0.101
+  #   security_opt:
+  #     - no-new-privileges:true
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - wireguard
+  #     - cloudflare-ddns
+
+  # wireguard:
+  #   image: linuxserver/wireguard
+  #   container_name: wireguard
+  #   environment:
+  #     - TZ=Europe/Athens
+  #     - PUID=1000
+  #     - PGID=1000
+  #     - PEERS=2
+  #     - SERVERURL=vpn.tur11ng.my.id
+  #     - SERVERPORT=51820
+  #     - LOG_CONFS=true
+  #     - INTERNAL_SUBNET=10.2.0.0/24
+  #     - ALLOWEDIPS=0.0.0.0/0
+  #     - PEERDNS=10.2.0.100
+  #     - PERSISTENTKEEPALIVE_PEERS=25
+  #   ports:
+  #     - 51820:51820/udp
+  #     - 8080:5000/tcp
+  #   cap_add:
+  #     - NET_ADMIN
+  #     # - SYS_MODULE
+  #   sysctls:
+  #     - net.ipv4.conf.all.src_valid_mark=1
+  #     - net.ipv4.ip_forward=1
+  #   volumes:
+  #     - /services/config/wireguard:/config:rw
+  #   networks:
+  #     homelab:
+  #       ipv4_address: 10.2.0.102
+  #   security_opt:
+  #     - no-new-privileges:true
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - unbound
+  #     - pihole
   
   pihole:
     container_name: pihole
