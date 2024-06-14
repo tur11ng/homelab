@@ -1,14 +1,14 @@
 services:
   unbound:
-    image: mvance/unbound-rpi:latest
     container_name: unbound
+    image: mvance/unbound-rpi:latest
     environment:
       - UNBOUND_IPV4_ADDRESS=10.2.0.100
     volumes:
       - /services/config/unbound:/opt/unbound/etc/unbound:rw 
     networks:
       homelab:
-        ipv4_address: 10.2.0.100
+        ipv4_address: 192.168.1.2
     cap_add:
       - NET_ADMIN
     security_opt:
@@ -18,25 +18,28 @@ services:
       - cloudflare-ddns
 
   wireguard:
-    image: linuxserver/wireguard:v1.0.20210914-ls7
     container_name: wireguard
+    image: linuxserver/wireguard:v1.0.20210914-ls7
     cap_add:
       - NET_ADMIN
     sysctls:
       - net.ipv4.ip_forward=1
     volumes:
       - /services/config/wireguard:/config:rw
+      - /services/config/wireguard-ui/wg0.conf:/config/wg0.conf:rw
+    dns:
+      - 192.168.1.2
     networks:
       homelab:
-        ipv4_address: 10.2.0.101
+        ipv4_address: 192.168.1.3
     restart: unless-stopped
     ports:
       - "5000:5000"
       - "51820:51820/udp"
 
   wireguard-ui:
-    image: ngoduykhanh/wireguard-ui:latest
     container_name: wireguard-ui
+    image: ngoduykhanh/wireguard-ui:latest
     cap_add:
       - NET_ADMIN
     network_mode: service:wireguard
@@ -65,25 +68,39 @@ services:
       - PIHOLE_IPV4_ADDRESS=10.2.0.103
       - WEBPASSWORD=${WEBPASSWORD}
     dns:
-      - 10.2.0.100
-    volumes:
-      - /services/config/pihole:/etc/pihole:rw
-      - /services/config/dnsmasq:/etc/dnsmasq.d:rw
-    cap_add:
-      - NET_ADMIN
+      - 192.168.1.2
     networks:
       homelab:
-        ipv4_address: 10.2.0.103
+        ipv4_address: 192.168.1.4
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
     depends_on:
+      - wireguard
+      - wireguard-ui
+      - cloudflare-ddns
+      - unbound
+
+  hello:
+    container_name: hello
+    image: nginxdemos/hello:latest
+    dns:
+      - 192.168.1.2
+    networks:
+      homelab:
+        ipv4_address: 192.168.1.5
+    restart: unless-stopped
+    depends_on:
+      - wireguard
+      - wireguard-ui
       - cloudflare-ddns
       - unbound
 
   nginx-proxy-manager:
-    image: 'jc21/nginx-proxy-manager:latest'
     container_name: nginx-proxy-manager
+    image: 'jc21/nginx-proxy-manager:latest'
+    dns:
+      - 192.168.1.2
     environment:
       - DISABLE_IPV6=true
     # ports:
@@ -95,7 +112,7 @@ services:
       - /services/config/letsencrypt:/etc/letsencrypt:rw
     networks:
       homelab:
-        ipv4_address: 10.2.0.104
+        ipv4_address: 192.168.1.4
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
@@ -103,85 +120,95 @@ services:
       - cloudflare-ddns
 
   homepage:
-    image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
+    image: ghcr.io/gethomepage/homepage:latest
+    dns:
+      - 192.168.1.2
     # ports:
     #   - 3000:3000
     volumes:
       - /services/config/homepage:/app/config:rw
     networks:
       homelab:
-        ipv4_address: 10.2.0.105
+        ipv4_address: 192.168.1.5
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
     depends_on: 
       - cloudflare-ddns
 
-  # portainer:
-  #   image: portainer/portainer-ce:latest
-  #   container_name: portainer
-  #   # ports:
-  #   #   - 9000:9000
-  #   volumes:
-  #     - /services/data/portainer:/data
-  #   networks:
-  #     homelab:
-  #       ipv4_address: 10.2.0.106
-  #   cap_add:
-  #     - NET_ADMIN
-  #   restart: unless-stopped
-  #   depends_on: 
-  #     - cloudflare-ddns
+  portainer:
+    container_name: portainer
+    image: portainer/portainer-ce:latest
+    dns:
+      - 192.168.1.2
+    # ports:
+    #   - 9000:9000
+    volumes:
+      - /services/data/portainer:/data
+    networks:
+      homelab:
+        ipv4_address: 192.168.1.6
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+    depends_on: 
+      - cloudflare-ddns
 
-  # nextcloud:
-  #   image: lscr.io/linuxserver/nextcloud:latest
-  #   container_name: nextcloud
-  #   environment:
-  #     - PUID=1000
-  #     - PGID=1000
-  #     - TZ=Etc/UTC
-  #   # ports:
-  #   #   - 443:443
-  #   volumes:
-  #     - /services/data/nextcloud:/data:rw
-  #     - /services/config/nextcloud:/config:rw
-  #   networks:
-  #     homelab:
-  #       ipv4_address: 10.2.0.107
-  #   security_opt:
-  #     - no-new-privileges
-  #   restart: unless-stopped
-  #   depends_on: 
-  #     - cloudflare-ddns
+  nextcloud:
+    container_name: nextcloud
+    image: lscr.io/linuxserver/nextcloud:latest
+    dns:
+      - 192.168.1.2
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    # ports:
+    #   - 443:443
+    volumes:
+      - /services/data/nextcloud:/data:rw
+      - /services/config/nextcloud:/config:rw
+    networks:
+      homelab:
+        ipv4_address: 192.168.1.7
+    security_opt:
+      - no-new-privileges
+    restart: unless-stopped
+    depends_on: 
+      - cloudflare-ddns
 
-  # vaultwarden:
-  #   image: vaultwarden/server:latest
-  #   container_name: vaultwarden
-  #   environment:
-  #     - ADMIN_TOKEN=${ADMIN_TOKEN}
-  #     - WEBSOCKET_ENABLED=true
-  #     - SIGNUPS_ALLOWED=false
-  #     - DOMAIN=${DOMAIN}
-  #   # ports:
-  #   #  - 443:80
-  #   volumes:
-  #     - /services/data/vaultwarden:/data:rw
-  #   networks:
-  #     homelab:
-  #       ipv4_address: 10.2.0.108
-  #   restart: unless-stopped
-  #   depends_on: 
-  #     - cloudflare-ddns
+  vaultwarden:
+    container_name: vaultwarden
+    image: vaultwarden/server:latest
+    dns:
+      - 192.168.1.2
+    environment:
+      - ADMIN_TOKEN=${ADMIN_TOKEN}
+      - WEBSOCKET_ENABLED=true
+      - SIGNUPS_ALLOWED=false
+      - DOMAIN=${DOMAIN}
+    # ports:
+    #  - 443:80
+    volumes:
+      - /services/data/vaultwarden:/data:rw
+    networks:
+      homelab:
+        ipv4_address: 192.168.1.8
+    restart: unless-stopped
+    depends_on: 
+      - cloudflare-ddns
 
   cloudflare-ddns:
-    image: timothyjmiller/cloudflare-ddns:latest
     container_name: cloudflare-ddns
+    image: timothyjmiller/cloudflare-ddns:latest
+    dns:
+      - 192.168.1.2
     security_opt:
       - no-new-privileges:true
     networks:
       homelab:
-        ipv4_address: 10.2.0.109
+        ipv4_address: 192.168.1.9
     restart: unless-stopped
     volumes:
       - /services/config/cloudflare-ddns/config.json:/config.json:rw
@@ -190,4 +217,4 @@ networks:
   homelab:
     ipam:
       config:
-        - subnet: 10.2.0.0/24
+        - subnet: 192.168.1.0/24
