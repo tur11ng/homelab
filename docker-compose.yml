@@ -3,12 +3,12 @@ services:
     container_name: unbound
     image: mvance/unbound-rpi:latest
     environment:
-      - UNBOUND_IPV4_ADDRESS=10.2.0.100
+      - UNBOUND_IPV4_ADDRESS=192.168.100.2
     volumes:
       - /services/config/unbound:/opt/unbound/etc/unbound:rw
     networks:
       homelab:
-        ipv4_address: 192.168.1.2
+        ipv4_address: 192.168.100.2
     cap_add:
       - NET_ADMIN
     security_opt:
@@ -28,10 +28,10 @@ services:
       - /services/config/wireguard:/config:rw
       - /services/config/wireguard-ui/wg0.conf:/config/wg0.conf:rw
     dns:
-      - 192.168.1.2
+      - 192.168.100.2
     networks:
       homelab:
-        ipv4_address: 192.168.1.3
+        ipv4_address: 192.168.100.3
     ports:
       - "5000:5000"
       - "51820:51820/udp"
@@ -65,15 +65,15 @@ services:
     container_name: pihole
     image: pihole/pihole:latest
     environment:
-      - PIHOLE_IPV4_ADDRESS=10.2.0.103
+      - DNS1=192.168.100.2
+      - DNS2=192.168.100.2
+      - PIHOLE_IPV4_ADDRESS=192.168.100.3
       - WEBPASSWORD=${WEBPASSWORD}
     dns:
-      - 192.168.1.2
+      - 192.168.100.2
     networks:
       homelab:
-        ipv4_address: 192.168.1.4
-    security_opt:
-      - no-new-privileges:true
+        ipv4_address: 192.168.100.4
     restart: unless-stopped
     depends_on:
       - wireguard
@@ -85,10 +85,10 @@ services:
     container_name: hello
     image: nginxdemos/hello:latest
     dns:
-      - 192.168.1.2
+      - 192.168.100.2
     networks:
       homelab:
-        ipv4_address: 192.168.1.5
+        ipv4_address: 192.168.100.5
     restart: unless-stopped
     depends_on:
       - wireguard
@@ -100,7 +100,7 @@ services:
     container_name: nginx-proxy-manager
     image: 'jc21/nginx-proxy-manager:latest'
     dns:
-      - 192.168.1.2
+      - 192.168.100.2
     environment:
       - DISABLE_IPV6=true
     volumes:
@@ -108,7 +108,7 @@ services:
       - /services/config/letsencrypt:/etc/letsencrypt:rw
     networks:
       homelab:
-        ipv4_address: 192.168.1.6
+        ipv4_address: 192.168.100.6
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
@@ -119,12 +119,12 @@ services:
     container_name: homepage
     image: ghcr.io/gethomepage/homepage:latest
     dns:
-      - 192.168.1.2
+      - 192.168.100.2
     volumes:
       - /services/config/homepage:/app/config:rw
     networks:
       homelab:
-        ipv4_address: 192.168.1.7
+        ipv4_address: 192.168.100.7
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
@@ -135,12 +135,12 @@ services:
     container_name: portainer
     image: portainer/portainer-ce:latest
     dns:
-      - 192.168.1.2
+      - 192.168.100.2
     volumes:
       - /services/data/portainer:/data
     networks:
       homelab:
-        ipv4_address: 192.168.1.8
+        ipv4_address: 192.168.100.8
     cap_add:
       - NET_ADMIN
     restart: unless-stopped
@@ -151,7 +151,7 @@ services:
     container_name: nextcloud
     image: lscr.io/linuxserver/nextcloud:latest
     dns:
-      - 192.168.1.2
+      - 192.168.100.2
     environment:
       - PUID=1000
       - PGID=1000
@@ -161,7 +161,7 @@ services:
       - /services/config/nextcloud:/config:rw
     networks:
       homelab:
-        ipv4_address: 192.168.1.9
+        ipv4_address: 192.168.100.9
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
@@ -172,7 +172,7 @@ services:
     container_name: vaultwarden
     image: vaultwarden/server:latest
     dns:
-      - 192.168.1.2
+      - 192.168.100.2
     environment:
       - ADMIN_TOKEN=${ADMIN_TOKEN}
       - WEBSOCKET_ENABLED=true
@@ -182,7 +182,7 @@ services:
       - /services/data/vaultwarden:/data:rw
     networks:
       homelab:
-        ipv4_address: 192.168.1.10
+        ipv4_address: 192.168.100.10
     restart: unless-stopped
     depends_on:
       - cloudflare-ddns
@@ -191,12 +191,12 @@ services:
     container_name: cloudflare-ddns
     image: timothyjmiller/cloudflare-ddns:latest
     dns:
-      - 192.168.1.2
+      - 192.168.100.2
     security_opt:
       - no-new-privileges:true
     networks:
       homelab:
-        ipv4_address: 192.168.1.11
+        ipv4_address: 192.168.100.11
     restart: unless-stopped
     volumes:
       - /services/config/cloudflare-ddns/config.json:/config.json:rw
@@ -205,4 +205,4 @@ networks:
   homelab:
     ipam:
       config:
-        - subnet: 192.168.1.0/24
+        - subnet: 192.168.100.0/24
