@@ -1,8 +1,8 @@
-# Homelab 
+# Homelab Raspberry Pi (Work in progress)
 
-# Notes
+## Notes
 
-## Docker Network
+### Docker Network
 
 * Bridge (Default):
     * When a container is launched without any specific network configuration, it will be attached to the default network which is a bridge network
