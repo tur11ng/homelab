@@ -1,5 +1,20 @@
 # Homelab Raspberry Pi (Work in progress)
 
+## Usage
+
+```bash
+# Clone the project
+git clone https://github.com/tur11ng/homelab-raspberrypi homelab-raspberrypi
+cd !$
+
+# Create ansible vault
+ansible-vault create groups_vars/secrets.yml
+
+# 
+
+tree zsh unattended-upgrades dnsutils grpcidr bsdmainutils iptables-persistent lm-sensors docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
 ## Notes
 
 ### Docker Network
