@@ -1,0 +1,25 @@
+services:
+  pihole:
+    container_name: pihole
+    image: pihole/pihole:latest
+    environment:
+      - DNS1=192.168.100.2
+      - DNS2=192.168.100.2
+      - PIHOLE_IPV4_ADDRESS=192.168.100.3
+      - WEBPASSWORD=${WEBPASSWORD}
+    dns:
+      - 192.168.100.2
+    networks:
+      homelab:
+        ipv4_address: 192.168.100.4
+    restart: unless-stopped
+    depends_on:
+      - wireguard
+      - wireguard-ui
+      - nginx-proxy-manager
+      - cloudflare-ddns
+      - unbound
+
+networks:
+  homelab:
+    external: true

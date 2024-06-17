@@ -10,9 +10,10 @@ cd !$
 # Create ansible vault
 ansible-vault create groups_vars/secrets.yml
 
-# 
+docker-compose -f docker-compose.yml -f docker-compose.unbound.yml -f docker-compose.wireguard.yml -f docker-compose.services.yml -f docker-compose.nextcloud.yml -f docker-compose.semaphore.yml up -d
 
-tree zsh unattended-upgrades dnsutils grpcidr bsdmainutils iptables-persistent lm-sensors docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# tree zsh unattended-upgrades dnsutils grpcidr bsdmainutils iptables-persistent lm-sensors docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
 ## Notes

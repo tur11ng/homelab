@@ -1,0 +1,58 @@
+services:
+  nextcloud:
+    container_name: nextcloud
+    image: nextcloud
+    dns:
+      - 192.168.100.2
+    volumes:
+      - /services/config/nextcloud:/var/www/html/config
+      - /services/data/nextcloud/data:/var/www/html/data
+      - /services/data/nextcloud/custom_apps:/var/www/html/custom_apps
+      - /services/data/nextcloud/apps:/var/www/html/apps
+      - /services/data/nextcloud/themes:/var/www/html/themes
+    networks:
+      homelab:
+        ipv4_address: 192.168.100.9
+    environment:
+      - NEXTCLOUD_DB_TYPE=mysql
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_HOST=127.0.0.1
+      - REDIS_HOST=127.0.0.1
+    restart: unless-stopped
+    depends_on:
+      - wireguard
+      - wireguard-ui
+      - cloudflare-ddns
+      - unbound
+
+  nextcloud-db:
+    container_name: nextcloud-db
+    image: mariadb
+    network_mode: service:nextcloud
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    volumes:
+      - /services/data/nextcloud-db:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    restart: unless-stopped
+    depends_on:
+      - wireguard
+      - wireguard-ui
+      - cloudflare-ddns
+      - unbound
+
+  nextcloud-redis:
+    container_name: nextcloud-redis
+    image: redis:alpine
+    network_mode: service:nextcloud
+    volumes:
+      - /services/data/nextcloud-redis:/data
+
+networks:
+  homelab:
+    external: true

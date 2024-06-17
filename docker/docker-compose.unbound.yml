@@ -1,0 +1,22 @@
+services:
+  unbound:
+    container_name: unbound
+    image: mvance/unbound-rpi:latest
+    environment:
+      - UNBOUND_IPV4_ADDRESS=192.168.100.2
+    volumes:
+      - /services/config/unbound:/opt/unbound/etc/unbound:rw
+    networks:
+      homelab:
+        ipv4_address: 192.168.100.2
+    cap_add:
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    depends_on:
+      - cloudflare-ddns
+
+networks:
+  homelab:
+    external: true
