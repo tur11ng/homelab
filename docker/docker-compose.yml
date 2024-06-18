@@ -164,81 +164,68 @@ services:
       - cloudflare-ddns
       - unbound
 
-  owncloud:
-    image: owncloud/server:${OWNCLOUD_VERSION}
-    container_name: owncloud
-    restart: always
+  nextcloud:
+    container_name: nextcloud
+    image: nextcloud
+    dns:
+      - 192.168.100.2
+    volumes:
+      - type: bind
+        source: /services/config/nextcloud-apache/nextcloud-apache-ssl.conf
+        target: /etc/apache2/sites-available/nextcloud-apache-ssl.conf
+      - type: bind
+        source: /services/config/nextcloud-apache/nextcloud-apache.conf
+        target: /etc/apache2/conf-enabled/nextcloud-apache.conf
+      - /services/config/nextcloud:/var/www/html/config
+      - /services/data/nextcloud/data:/var/www/html/data
+      - /services/data/nextcloud/custom_apps:/var/www/html/custom_apps
+      - /services/data/nextcloud/apps:/var/www/html/apps
+      - /services/data/nextcloud/themes:/var/www/html/themes
+      - /services/config/letsencrypt/archive/npm-2:/etc/apache2/ssl:ro
     networks:
       homelab:
         ipv4_address: 192.168.100.9
-    dns:
-      192.168.100.2
-    depends_on:
-      - wireguard
-      - wireguard-ui
-      - cloudflare-ddns
     environment:
-      - OWNCLOUD_DOMAIN=${OWNCLOUD_DOMAIN}
-      - OWNCLOUD_TRUSTED_DOMAINS=${OWNCLOUD_TRUSTED_DOMAINS}
-      - OWNCLOUD_DB_TYPE=mysql
-      - OWNCLOUD_DB_NAME=${MYSQL_DATABASE}
-      - OWNCLOUD_DB_USERNAME=${MYSQL_USER}
-      - OWNCLOUD_DB_PASSWORD=${MYSQL_PASSWORD}
-      - OWNCLOUD_DB_HOST=127.0.0.1
-      - OWNCLOUD_ADMIN_USERNAME=${OWNCLOUD_ADMIN_USERNAME}
-      - OWNCLOUD_ADMIN_PASSWORD=${OWNCLOUD_ADMIN_PASSWORD}
-      - OWNCLOUD_MYSQL_UTF8MB4=true
-      - OWNCLOUD_REDIS_ENABLED=true
-      - OWNCLOUD_REDIS_HOST=127.0.0.1
-    volumes:
-      - /services/data/owncloud:/data
-
-  owncloud-mariadb:
-    image: mariadb:10.11
-    container_name: owncloud-mariadb
-    network_mode: service:owncloud
-    restart: always
-    environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - NEXTCLOUD_DB_TYPE=mysql
+      - MYSQL_DATABASE=nextcloud
       - MYSQL_USER=${MYSQL_USER}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
-      - MARIADB_AUTO_UPGRADE=1
-    command: ["--max-allowed-packet=128M", "--innodb-log-file-size=64M"]
-    volumes:
-      - /services/data/owncloud-mariadb:/var/lib/mysql
-  
-  owncloud-redis:
-    image: redis:6
-    container_name: owncloud_redis
-    network_mode: service:owncloud
-    restart: always
-    command: ["--databases", "1"]
-    volumes:
-      - /services/data/owncloud-redis:/data
-
-  vaultwarden:
-    container_name: vaultwarden
-    image: vaultwarden/server:latest
-    dns:
-      - 192.168.100.2
-    environment:
-      - ADMIN_TOKEN=${ADMIN_TOKEN}
-      - WEBSOCKET_ENABLED=true
-      - SIGNUPS_ALLOWED=false
-      - DOMAIN=${DOMAIN}
-    volumes:
-      - /services/data/vaultwarden:/data:rw
-    networks:
-      homelab:
-        ipv4_address: 192.168.100.10
+      - MYSQL_HOST=127.0.0.1
+      - REDIS_HOST=127.0.0.1
+      - SKIP_DOMAIN_VALIDATION=true
     restart: unless-stopped
     depends_on:
       - wireguard
       - wireguard-ui
-      - nginx-proxy-manager
       - cloudflare-ddns
       - unbound
+    entrypoint: /bin/sh -c "ln -s /etc/apache2/sites-available/nextcloud-apache-ssl.conf /etc/apache2/sites-enabled/nextcloud-apache-ssl.conf && apache2-foreground"
+
+  nextcloud-db:
+    container_name: nextcloud-db
+    image: mariadb
+    network_mode: service:nextcloud
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    volumes:
+      - /services/data/nextcloud-db:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    restart: unless-stopped
+    depends_on:
+      - wireguard
+      - wireguard-ui
+      - cloudflare-ddns
+      - unbound
+
+  nextcloud-redis:
+    container_name: nextcloud-redis
+    image: redis:alpine
+    network_mode: service:nextcloud
+    volumes:
+      - /services/data/nextcloud-redis:/data
 
   semaphore-ui:
     container_name: semaphore-ui
