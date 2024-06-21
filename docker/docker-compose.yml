@@ -7,7 +7,7 @@ services:
     volumes:
       - /services/config/unbound:/opt/unbound/etc/unbound:rw
     networks:
-      homelab:
+      homelab-internal:
         ipv4_address: 192.168.100.2
     cap_add:
       - NET_ADMIN
@@ -30,7 +30,7 @@ services:
     dns:
       - 192.168.100.2
     networks:
-      homelab:
+      homelab-internal:
         ipv4_address: 192.168.100.3
     ports:
       - "5000:5000"
@@ -77,7 +77,7 @@ services:
     dns:
       - 192.168.100.2
     networks:
-      homelab:
+      homelab-internal:
         ipv4_address: 192.168.100.4
     restart: unless-stopped
     depends_on:
@@ -87,23 +87,8 @@ services:
       - cloudflare-ddns
       - unbound
 
-  # hello:
-  #   container_name: hello
-  #   image: nginxdemos/hello:latest
-  #   dns:
-  #     - 192.168.100.2
-  #   networks:
-  #     homelab:
-  #       ipv4_address: 192.168.100.5
-  #   restart: unless-stopped
-  #   depends_on:
-  #     - wireguard
-  #     - wireguard-ui
-  #     - cloudflare-ddns
-  #     - unbound
-
   nginx-proxy-manager:
-    container_name: nginx-proxy-manager
+    container_name: nginx-proxy-manage
     image: jc21/nginx-proxy-manager:latest
     dns:
       - 192.168.100.2
@@ -113,7 +98,7 @@ services:
       - /services/data/nginx-proxy-manager:/data:rw
       - /services/config/letsencrypt:/etc/letsencrypt:rw
     networks:
-      homelab:
+      homelab-internal:
         ipv4_address: 192.168.100.6
     security_opt:
       - no-new-privileges:true
@@ -132,7 +117,7 @@ services:
     volumes:
       - /services/config/homepage:/app/config:rw
     networks:
-      homelab:
+      homelab-internal:
         ipv4_address: 192.168.100.7
     security_opt:
       - no-new-privileges:true
@@ -152,7 +137,7 @@ services:
     volumes:
       - /services/data/portainer:/data
     networks:
-      homelab:
+      homelab-internal:
         ipv4_address: 192.168.100.8
     cap_add:
       - NET_ADMIN
@@ -163,29 +148,6 @@ services:
       - nginx-proxy-manager
       - cloudflare-ddns
       - unbound
-
-  nextcloud-aio-mastercontainer:
-    image: nextcloud/all-in-one:latest
-    init: true
-    restart: always
-    container_name: nextcloud-aio-mastercontainer # This line is not allowed to be changed as otherwise AIO will not work correctly
-    dns:
-      - 192.168.100.2
-    volumes:
-      - nextcloud_aio_mastercontainer:/mnt/docker-aio-config # This line is not allowed to be changed as otherwise the built-in backup solution will not work
-      - /var/run/docker.sock:/var/run/docker.sock:ro # May be changed on macOS, Windows or docker rootless. See the applicable documentation. If adjusting, don't forget to also set 'WATCHTOWER_DOCKER_SOCKET_PATH'!
-    ports:
-      - 8080:8080
-    environment:
-      - APACHE_PORT=11000
-      - APACHE_IP_BINDING=0.0.0.0
-      - COLLABORA_SECCOMP_DISABLED=false
-      - NEXTCLOUD_UPLOAD_LIMIT:=10G
-      - NEXTCLOUD_MAX_TIME=3600
-      - NEXTCLOUD_STARTUP_APPS=deck twofactor_totp tasks calendar contacts notes
-    networks:
-      homelab:
-        ipv4_address: 192.168.100.9
 
   semaphore-ui:
     container_name: semaphore-ui
@@ -199,7 +161,7 @@ services:
       - SEMAPHORE_ADMIN_EMAIL={SEMAPHORE_ADMIN_EMAIL}
       - SEMAPHORE_ADMIN={SEMAPHORE_ADMIN}
     networks:
-      homelab:
+      homelab-internal:
         ipv4_address: 192.168.100.11
     restart: unless-stopped
     depends_on:
@@ -217,18 +179,32 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      homelab:
+      homelab-internal:
         ipv4_address: 192.168.100.12
     restart: unless-stopped
     volumes:
       - /services/config/cloudflare-ddns/config.json:/config.json:rw
 
+########## External ##########
+
+  nextcloud-aio-mastercontainer:
+    image: nextcloud/all-in-one:latest
+    init: true
+    restart: always
+    container_name: nextcloud-aio-mastercontainer # This line is not allowed to be changed as otherwise AIO will not work correctly
+    volumes:
+      - /services/data/nextcloud-aio:/mnt/docker-aio-config # This line is not allowed to be changed as otherwise the built-in backup solution will not work
+      - /var/run/docker.sock:/var/run/docker.sock:ro # May be changed on macOS, Windows or docker rootless. See the applicable documentation. If adjusting, don't forget to also set 'WATCHTOWER_DOCKER_SOCKET_PATH'!
+    ports:
+      - 443:8443
+    environment:
+      - COLLABORA_SECCOMP_DISABLED=false
+      - NEXTCLOUD_UPLOAD_LIMIT:=10G
+      - NEXTCLOUD_MAX_TIME=3600
+      - NEXTCLOUD_STARTUP_APPS=deck twofactor_totp tasks calendar contacts notes
+
 networks:
-  homelab:
+  homelab-internal:
     ipam:
       config:
         - subnet: 192.168.100.0/24
-
-volumes:
-  nextcloud_aio_mastercontainer:
-    name: nextcloud_aio_mastercontainer
