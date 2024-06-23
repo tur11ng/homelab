@@ -209,7 +209,7 @@ services:
       - "443:443"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.dashboard.rule=Host(`tur11ng.my.id`)"
+      - "traefik.http.routers.dashboard.rule=Host(`${TRAEFIK_HOSTNAME}`)"
       - "traefik.http.routers.dashboard.service=api@internal"
       - "traefik.http.routers.dashboard.entrypoints=websecure"
       - "traefik.http.services.dashboard.loadbalancer.server.port=8080"
@@ -252,7 +252,7 @@ services:
       - REDIS_HOST=localhost
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.nextcloud.rule=Host(`nextcloud.tur11ng.my.id`)"
+      - "traefik.http.routers.nextcloud.rule=Host(`${NEXTCLOUD_HOSTNAME}`)"
       - "traefik.http.routers.nextcloud.service=nextcloud"
       - "traefik.http.routers.nextcloud.entrypoints=websecure"
       - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
