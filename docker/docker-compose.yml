@@ -16,6 +16,12 @@ services:
     restart: unless-stopped
     depends_on:
       - cloudflare-ddns
+    healthcheck:
+      test: ["CMD", "unbound-control", "status"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   wireguard:
     container_name: wireguard
@@ -39,6 +45,11 @@ services:
     depends_on:
       - cloudflare-ddns
       - unbound
+    healthcheck:
+      test: ["CMD", "pgrep", "wireguard"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
 
   wireguard-ui:
     container_name: wireguard-ui
@@ -61,6 +72,11 @@ services:
       - wireguard
       - cloudflare-ddns
       - unbound
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
 
   pihole:
     container_name: pihole
@@ -82,6 +98,11 @@ services:
       - nginx-proxy-manager
       - cloudflare-ddns
       - unbound
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/admin/"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
 
   nginx-proxy-manager:
     container_name: nginx-proxy-manager
@@ -104,6 +125,11 @@ services:
       - wireguard-ui
       - cloudflare-ddns
       - unbound
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:81"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
 
   homepage:
     container_name: homepage
@@ -124,6 +150,11 @@ services:
       - nginx-proxy-manager
       - cloudflare-ddns
       - unbound
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
 
   portainer:
     container_name: portainer
@@ -132,6 +163,7 @@ services:
       - 192.168.100.2
     volumes:
       - /services/data/portainer:/data
+      - "/var/run/docker.sock:/var/run/docker.sock"
     networks:
       homelab-internal:
         ipv4_address: 192.168.100.8
@@ -144,6 +176,11 @@ services:
       - nginx-proxy-manager
       - cloudflare-ddns
       - unbound
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
 
   semaphore-ui:
     container_name: semaphore-ui
@@ -166,6 +203,11 @@ services:
       - nginx-proxy-manager
       - cloudflare-ddns
       - unbound
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
 
   cloudflare-ddns:
     container_name: cloudflare-ddns
@@ -180,6 +222,11 @@ services:
     restart: unless-stopped
     volumes:
       - /services/config/cloudflare-ddns/config.json:/config.json:rw
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
 
 ########## External ##########
 
@@ -190,7 +237,7 @@ services:
       - "--log.level=${TRAEFIK_LOG_LEVEL}"
       - "--accesslog=true"
       - "--api.dashboard=true"
-      - "--api.insecure=true"
+      - "--api.insecure=false"
       - "--entryPoints.web.address=:80"
       - "--entryPoints.websecure.address=:443"
       - "--providers.docker=true"
@@ -213,11 +260,10 @@ services:
       - "traefik.http.routers.dashboard.service=api@internal"
       - "traefik.http.routers.dashboard.entrypoints=websecure"
       - "traefik.http.services.dashboard.loadbalancer.server.port=8080"
-      - "traefik.http.routers.dashboard.tls=true"
-      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
-      - "traefik.http.services.dashboard.loadbalancer.passhostheader=true"
-      - "traefik.http.routers.dashboard.middlewares=authtraefik"
       - "traefik.http.middlewares.authtraefik.basicauth.users=${TRAEFIK_BASIC_AUTH}"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.middlewares=authtraefik"
+      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
       - "traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)"
       - "traefik.http.routers.http-catchall.entrypoints=web"
       - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
@@ -225,6 +271,11 @@ services:
     networks:
       - homelab-external
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/ping"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
 
   nextcloud:
     container_name: nextcloud
@@ -238,7 +289,7 @@ services:
       - /services/data/geoipupdate:/geoipupdate
       - /mnt/external-drive:/mnt/external-drive:ro
     environment:
-      - OVERWRITEHOST=${OVERWRITEHOST}
+#      - OVERWRITEHOST=${OVERWRITEHOST}
       - OVERWRITEPROTOCOL=https
       - NEXTCLOUD_ADMIN_USER=${NEXTCLOUD_ADMIN_USER}
       - NEXTCLOUD_ADMIN_PASSWORD=${NEXTCLOUD_ADMIN_PASSWORD}
@@ -250,6 +301,7 @@ services:
       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
       - MYSQL_HOST=localhost
       - REDIS_HOST=localhost
+      - SKIL_DOMAIN_VALIDATION=true
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.nextcloud.rule=Host(`${NEXTCLOUD_HOSTNAME}`)"
@@ -259,14 +311,18 @@ services:
       - "traefik.http.routers.nextcloud.tls=true"
       - "traefik.http.routers.nextcloud.tls.certresolver=letsencrypt"
       - "traefik.http.services.nextcloud.loadbalancer.passhostheader=true"
-      - "traefik.http.routers.nextcloud.middlewares=compresstraefik"
-      - "traefik.http.middlewares.compresstraefik.compress=true"
-      - "traefik.docker.network=traefik-network"
+      - "traefik.docker.network=homelab-external"
     restart: unless-stopped
     networks:
       - homelab-external
     depends_on:
       - cloudflare-ddns
+      - traefik
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/status.php"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
 
   nextcloud-db:
     container_name: nextcloud-db
@@ -283,6 +339,11 @@ services:
     restart: unless-stopped
     depends_on:
       - cloudflare-ddns
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "--silent"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
 
   nextcloud-redis:
     container_name: nextcloud-redis
@@ -292,6 +353,11 @@ services:
       - /services/data/nextcloud-redis:/data
     depends_on:
       - cloudflare-ddns
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
 
   geoipupdate:
     image: maxmindinc/geoipupdate:latest
@@ -303,6 +369,11 @@ services:
       - GEOIPUPDATE_FREQUENCY=24
     volumes:
       - /services/data/geoipupdate:/usr/share/GeoIP
+    healthcheck:
+      test: ["CMD", "geoipupdate", "-v"]
+      interval: 1h
+      timeout: 60s
+      retries: 3
 
 networks:
   homelab-internal:
