@@ -54,10 +54,6 @@ services:
       - WGUI_MANAGE_START=true
       - WGUI_MANAGE_RESTART=true
       - WG_CONF_TEMPLATE
-    logging:
-      driver: json-file
-      options:
-        max-size: 50m
     volumes:
       - /services/data/wireguard-ui:/app/db:rw
       - /services/config/wireguard-ui:/config:rw
@@ -88,7 +84,7 @@ services:
       - unbound
 
   nginx-proxy-manager:
-    container_name: nginx-proxy-manage
+    container_name: nginx-proxy-manager
     image: jc21/nginx-proxy-manager:latest
     dns:
       - 192.168.100.2
@@ -186,48 +182,89 @@ services:
       - /services/config/cloudflare-ddns/config.json:/config.json:rw
 
 ########## External ##########
+
   traefik:
+    image: traefik:2.9
     container_name: traefik
-    image: traefik:v2.9
-    environment:
-      - TRAEFIK_LOG_LEVEL=INFO
-      - TRAEFIK_PROVIDERS_DOCKER=true
-      - TRAEFIK_ENTRYPOINTS_HTTP_ADDRESS=:80
-      - TRAEFIK_ENTRYPOINTS_HTTPS_ADDRESS=:443
-      - TRAEFIK_CERTIFICATESRESOLVERS_LE_ACME_HTTPCHALLENGE_ENTRYPOINT=http
-      - TRAEFIK_CERTIFICATESRESOLVERS_LE_ACME_EMAIL=${TRAEFIK_CERTIFICATESRESOLVERS_LE_ACME_EMAIL}
-      - TRAEFIK_CERTIFICATESRESOLVERS_LE_ACME_STORAGE=/letsencrypt/acme.json
-      - `RAEFIK_CERTIFICATESRESOLVERS_LE_ACME_HTTPCHALLENGE=true
-      - TRAEFIK_API=true
+    command:
+      - "--log.level=${TRAEFIK_LOG_LEVEL}"
+      - "--accesslog=true"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.websecure.address=:443"
+      - "--providers.docker=true"
+      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+      - "--providers.docker.exposedByDefault=false"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json"
+      - "--global.checkNewVersion=true"
+      - "--global.sendAnonymousUsage=false"
     volumes:
-      - /services/data/traefik:/letsencrypt
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /services/config/traefik/traefik.toml:/etc/traefik/traefik.toml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /services/data/traefik:/etc/traefik/acme
+    ports:
+      - "80:80"
+      - "443:443"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`tur11ng.my.id`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.services.dashboard.loadbalancer.server.port=8080"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.services.dashboard.loadbalancer.passhostheader=true"
+      - "traefik.http.routers.dashboard.middlewares=authtraefik"
+      - "traefik.http.middlewares.authtraefik.basicauth.users=${TRAEFIK_BASIC_AUTH}"
+      - "traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)"
+      - "traefik.http.routers.http-catchall.entrypoints=web"
+      - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+    networks:
+      - homelab-external
     restart: unless-stopped
-    depends_on:
-      - cloudflare-ddns
 
   nextcloud:
     container_name: nextcloud
-    image: nextcloud
+    image: nextcloud:apache
     volumes:
       - /services/config/nextcloud:/var/www/html/config
       - /services/data/nextcloud/data:/var/www/html/data
       - /services/data/nextcloud/custom_apps:/var/www/html/custom_apps
       - /services/data/nextcloud/apps:/var/www/html/apps
       - /services/data/nextcloud/themes:/var/www/html/themes
+      - /services/data/geoipupdate:/geoipupdate
+      - /mnt/external-drive:/mnt/external-drive:ro
     environment:
+      - OVERWRITEHOST=${OVERWRITEHOST}
+      - OVERWRITEPROTOCOL=https
       - NEXTCLOUD_ADMIN_USER=${NEXTCLOUD_ADMIN_USER}
       - NEXTCLOUD_ADMIN_PASSWORD=${NEXTCLOUD_ADMIN_PASSWORD}
       - NEXTCLOUD_TRUSTED_DOMAINS=${NEXTCLOUD_TRUSTED_DOMAINS}
-      - TRUSTED_PROXIES=traefik
+      - TRUSTED_PROXIES=192.168.0.0/16 172.16.0.0/12 10.0.0.0/8
+      - APACHE_DISABLE_REWRITE_IP=1
       - MYSQL_DATABASE=${MYSQL_DATABASE}
       - MYSQL_USER=${MYSQL_USER}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
-      - MYSQL_HOST=127.0.0.1
-      - REDIS_HOST=127.0.0.1
-      - SKIP_DOMAIN_VALIDATION=true
+      - MYSQL_HOST=localhost
+      - REDIS_HOST=localhost
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nextcloud.rule=Host(`nextcloud.tur11ng.my.id`)"
+      - "traefik.http.routers.nextcloud.service=nextcloud"
+      - "traefik.http.routers.nextcloud.entrypoints=websecure"
+      - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
+      - "traefik.http.routers.nextcloud.tls=true"
+      - "traefik.http.routers.nextcloud.tls.certresolver=letsencrypt"
+      - "traefik.http.services.nextcloud.loadbalancer.passhostheader=true"
+      - "traefik.http.routers.nextcloud.middlewares=compresstraefik"
+      - "traefik.http.middlewares.compresstraefik.compress=true"
+      - "traefik.docker.network=traefik-network"
     restart: unless-stopped
+    networks:
+      - homelab-external
     depends_on:
       - cloudflare-ddns
 
@@ -256,8 +293,20 @@ services:
     depends_on:
       - cloudflare-ddns
 
+  geoipupdate:
+    image: maxmindinc/geoipupdate:latest
+    container_name: geoipupdate
+    environment:
+      - GEOIPUPDATE_ACCOUNT_ID=${GEOIPUPDATE_ACCOUNT_ID}
+      - GEOIPUPDATE_LICENSE_KEY=${GEOIPUPDATE_LICENSE_KEY}
+      - GEOIPUPDATE_EDITION_IDS=GeoLite2-Country
+      - GEOIPUPDATE_FREQUENCY=24
+    volumes:
+      - /services/data/geoipupdate:/usr/share/GeoIP
+
 networks:
   homelab-internal:
     ipam:
       config:
         - subnet: 192.168.100.0/24
+  homelab-external:
