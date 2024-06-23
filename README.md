@@ -10,7 +10,8 @@ cd !$
 # Create ansible vault
 ansible-vault create groups_vars/secrets.yml
 
-docker-compose -f docker-compose.yml -f docker-compose.unbound.yml -f docker-compose.wireguard.yml -f docker-compose.services.yml -f docker-compose.nextcloud.yml -f docker-compose.semaphore.yml up -d
+# Start docker services
+docker-compose -f docker-compose.internal.yml -f docker-compose.external.yml up -d
 ```
 
 ## Troubleshooting
