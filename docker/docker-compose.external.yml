@@ -58,7 +58,7 @@ services:
       - /services/data/geoipupdate:/geoipupdate
       - /mnt/external-drive:/mnt/external-drive:ro
     environment:
-#      - OVERWRITEHOST=${OVERWRITEHOST}
+      - OVERWRITEHOST=${OVERWRITEHOST}
       - OVERWRITEPROTOCOL=https
       - NEXTCLOUD_ADMIN_USER=${NEXTCLOUD_ADMIN_USER}
       - NEXTCLOUD_ADMIN_PASSWORD=${NEXTCLOUD_ADMIN_PASSWORD}

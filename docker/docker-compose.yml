@@ -1,0 +1,478 @@
+services:
+  unbound:
+    container_name: unbound
+    image: mvance/unbound-rpi:latest
+    environment:
+      - UNBOUND_IPV4_ADDRESS=192.168.100.2
+    volumes:
+      - /services/config/unbound:/opt/unbound/etc/unbound:rw
+    networks:
+      homelab-internal:
+        ipv4_address: 192.168.100.2
+    cap_add:
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    depends_on:
+      - cloudflare-ddns
+    healthcheck:
+      test: ["CMD", "unbound-control", "status"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  wireguard:
+    container_name: wireguard
+    image: linuxserver/wireguard:v1.0.20210914-ls7
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv4.ip_forward=1
+    volumes:
+      - /services/config/wireguard:/config:rw
+      - /services/config/wireguard-ui/wg0.conf:/config/wg0.conf:rw
+    dns:
+      - 192.168.100.2
+    networks:
+      homelab-internal:
+        ipv4_address: 192.168.100.3
+    ports:
+      - "5000:5000"
+      - "51820:51820/udp"
+    restart: unless-stopped
+    depends_on:
+      - cloudflare-ddns
+      - unbound
+    healthcheck:
+      test: ["CMD", "pgrep", "wireguard"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+
+  wireguard-ui:
+    container_name: wireguard-ui
+    image: ngoduykhanh/wireguard-ui:latest
+    cap_add:
+      - NET_ADMIN
+    network_mode: service:wireguard
+    environment:
+      - SESSION_SECRET=${SESSION_SECRET}
+      - WGUI_USERNAME=${WGUI_USERNAME}
+      - WGUI_PASSWORD=${WGUI_PASSWORD}
+      - WG_CONF_TEMPLATE
+      - WGUI_MANAGE_START=true
+      - WGUI_MANAGE_RESTART=true
+      - WG_CONF_TEMPLATE
+    volumes:
+      - /services/data/wireguard-ui:/app/db:rw
+      - /services/config/wireguard-ui:/config:rw
+    depends_on:
+      - wireguard
+      - cloudflare-ddns
+      - unbound
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+
+  pihole:
+    container_name: pihole
+    image: pihole/pihole:latest
+    environment:
+      - DNS1=192.168.100.2
+      - DNS2=192.168.100.2
+      - PIHOLE_IPV4_ADDRESS=192.168.100.3
+      - WEBPASSWORD=${WEBPASSWORD}
+    dns:
+      - 192.168.100.2
+    networks:
+      homelab-internal:
+        ipv4_address: 192.168.100.4
+    restart: unless-stopped
+    depends_on:
+      - wireguard
+      - wireguard-ui
+      - nginx-proxy-manager
+      - cloudflare-ddns
+      - unbound
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/admin/"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+
+  nginx-proxy-manager:
+    container_name: nginx-proxy-manager
+    image: jc21/nginx-proxy-manager:latest
+    dns:
+      - 192.168.100.2
+    environment:
+      - DISABLE_IPV6=true
+    volumes:
+      - /services/data/nginx-proxy-manager:/data:rw
+      - /services/config/letsencrypt:/etc/letsencrypt:rw
+    networks:
+      homelab-internal:
+        ipv4_address: 192.168.100.6
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    depends_on:
+      - wireguard
+      - wireguard-ui
+      - cloudflare-ddns
+      - unbound
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:81"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+
+  homepage:
+    container_name: homepage
+    image: ghcr.io/gethomepage/homepage:latest
+    dns:
+      - 192.168.100.2
+    volumes:
+      - /services/config/homepage:/app/config:rw
+    networks:
+      homelab-internal:
+        ipv4_address: 192.168.100.7
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    depends_on:
+      - wireguard
+      - wireguard-ui
+      - nginx-proxy-manager
+      - cloudflare-ddns
+      - unbound
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+
+  portainer:
+    container_name: portainer
+    image: portainer/portainer-ce:latest
+    dns:
+      - 192.168.100.2
+    volumes:
+      - /services/data/portainer:/data
+#      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      homelab-internal:
+        ipv4_address: 192.168.100.8
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+    depends_on:
+      - wireguard
+      - wireguard-ui
+      - nginx-proxy-manager
+      - cloudflare-ddns
+      - unbound
+
+  semaphore-ui:
+    container_name: semaphore-ui
+    image: semaphoreui/semaphore:latest
+    dns:
+      - 192.168.100.2
+    environment:
+      - SEMAPHORE_DB_DIALECT=bolt
+      - SEMAPHORE_ADMIN_NAME={SEMAPHORE_ADMIN_NAME}
+      - SEMAPHORE_ADMIN_PASSWORD=${SEMAPHORE_ADMIN_PASSWORD}
+      - SEMAPHORE_ADMIN_EMAIL={SEMAPHORE_ADMIN_EMAIL}
+      - SEMAPHORE_ADMIN={SEMAPHORE_ADMIN}
+    networks:
+      homelab-internal:
+        ipv4_address: 192.168.100.11
+    restart: unless-stopped
+    depends_on:
+      - wireguard
+      - wireguard-ui
+      - nginx-proxy-manager
+      - cloudflare-ddns
+      - unbound
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+
+  cloudflare-ddns:
+    container_name: cloudflare-ddns
+    image: timothyjmiller/cloudflare-ddns:latest
+    dns:
+      - 192.168.100.2
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      homelab-internal:
+        ipv4_address: 192.168.100.12
+    restart: unless-stopped
+    volumes:
+      - /services/config/cloudflare-ddns/config.json:/config.json:rw
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+
+########## External ##########
+
+  traefik:
+    image: traefik:2.9
+    container_name: traefik
+    command:
+      - "--log.level=${TRAEFIK_LOG_LEVEL}"
+      - "--accesslog=true"
+      - "--api.dashboard=false"
+      - "--api.insecure=false"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.websecure.address=:443"
+      - "--providers.docker=true"
+      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+      - "--providers.docker.exposedByDefault=false"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json"
+      - "--global.checkNewVersion=true"
+      - "--global.sendAnonymousUsage=false"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /services/data/traefik:/etc/traefik/acme
+    ports:
+      - "80:80"
+      - "443:443"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)"
+      - "traefik.http.routers.http-catchall.entrypoints=web"
+      - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+    networks:
+      - homelab-external
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/ping"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+
+  nextcloud:
+    container_name: nextcloud
+    image: nextcloud:apache
+    volumes:
+      - /services/data/nextcloud:/var/www/html/
+      - /mnt/external-drive:/mnt/external-drive:ro
+    environment:
+      - OVERWRITEHOST=${OVERWRITEHOST}
+      - OVERWRITEPROTOCOL=https
+      - NEXTCLOUD_ADMIN_USER=${NEXTCLOUD_ADMIN_USER}
+      - NEXTCLOUD_ADMIN_PASSWORD=${NEXTCLOUD_ADMIN_PASSWORD}
+      - NEXTCLOUD_TRUSTED_DOMAINS=${NEXTCLOUD_TRUSTED_DOMAINS}
+      - TRUSTED_PROXIES=192.168.0.0/16 172.16.0.0/12 10.0.0.0/8
+      - APACHE_DISABLE_REWRITE_IP=1
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_HOST=nextcloud-db
+      - REDIS_HOST=nextcloud-redis
+      - SKIP_DOMAIN_VALIDATION=true
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nextcloud.rule=Host(`${NEXTCLOUD_HOSTNAME}`)"
+      - "traefik.http.routers.nextcloud.service=nextcloud"
+      - "traefik.http.routers.nextcloud.entrypoints=websecure"
+      - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
+      - "traefik.http.routers.nextcloud.tls=true"
+      - "traefik.http.routers.nextcloud.tls.certresolver=letsencrypt"
+      - "traefik.http.services.nextcloud.loadbalancer.passhostheader=true"
+      - "traefik.docker.network=homelab-external"
+    restart: unless-stopped
+    networks:
+      - homelab-external
+    depends_on:
+      - cloudflare-ddns
+      - traefik
+      - nextcloud-db
+      - nextcloud-redis
+
+  nextcloud-db:
+    container_name: nextcloud-db
+    image: mariadb
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    volumes:
+      - /services/data/nextcloud-db:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    restart: unless-stopped
+    networks:
+      - homelab-external
+    depends_on:
+      - cloudflare-ddns
+
+  nextcloud-redis:
+    container_name: nextcloud-redis
+    image: redis:alpine
+    volumes:
+      - /services/data/nextcloud-redis:/data
+    networks:
+      - homelab-external
+    depends_on:
+      - cloudflare-ddns
+
+  geoipupdate:
+    image: maxmindinc/geoipupdate:latest
+    container_name: geoipupdate
+    environment:
+      - GEOIPUPDATE_ACCOUNT_ID=${GEOIPUPDATE_ACCOUNT_ID}
+      - GEOIPUPDATE_LICENSE_KEY=${GEOIPUPDATE_LICENSE_KEY}
+      - GEOIPUPDATE_EDITION_IDS=GeoLite2-Country
+      - GEOIPUPDATE_FREQUENCY=24
+    volumes:
+      - /services/data/geoipupdate:/usr/share/GeoIP
+
+  mailu-front:
+    image: mailu/nginx:master
+    restart: always
+    env_file: .env
+    logging:
+      driver: journald
+      options:
+        tag: mailu-front
+    ports:
+    - "$BIND_ADDRESS4:80:80"
+    - "$BIND_ADDRESS4:443:443"
+    - "$BIND_ADDRESS4:110:110"
+    - "$BIND_ADDRESS4:143:143"
+    - "$BIND_ADDRESS4:993:993"
+    - "$BIND_ADDRESS4:995:995"
+    - "$BIND_ADDRESS4:25:25"
+    - "$BIND_ADDRESS4:465:465"
+    - "$BIND_ADDRESS4:587:587"
+    volumes:
+      - "$ROOT/certs:/certs"
+      - "$ROOT/overrides/nginx:/overrides:ro"
+
+  mailu-redis:
+    image: redis:alpine
+    restart: always
+    volumes:
+      - "/services/data/mailu-redis:/data"
+
+  mailu-imap:
+    image: mailu/dovecot:master
+    restart: always
+    env_file: .env
+    logging:
+      driver: journald
+      options:
+        tag: mailu-imap
+    volumes:
+      - "/services/data/mailu-imap/mail:/mail"
+      - "$ROOT/overrides/dovecot:/overrides:ro"
+    depends_on:
+      - mailu-front
+
+  mailu-smtp:
+    image: mailu/postfix:master
+    restart: always
+    env_file: .env
+    logging:
+      driver: journald
+      options:
+        tag: mailu-smtp
+    volumes:
+      - "$ROOT/mailqueue:/queue"
+      - "$ROOT/overrides/postfix:/overrides:ro"
+    depends_on:
+      - mailu-front
+
+  mailu-antispam:
+    image: mailu/rspamd:master
+    restart: always
+    env_file: .env
+    logging:
+      driver: journald
+      options:
+        tag: mailu-antispam
+    volumes:
+      - "$ROOT/filter:/var/lib/rspamd"
+      - "$ROOT/dkim:/dkim:ro"
+      - "$ROOT/overrides/rspamd:/etc/rspamd/override.d:ro"
+    depends_on:
+      - mailu-front
+
+#  mailu-antivirus:
+#    image: mailu/none:master
+#    restart: always
+#    env_file: .env
+#    volumes:
+#      - "$ROOT/filter:/data"
+
+#  mailu-webdav:
+#    image: mailu/none:master
+#    restart: always
+#    env_file: .env
+#    volumes:
+#      - "$ROOT/dav:/data"
+
+  mailu-admin:
+    image: mailu/admin:master
+    restart: always
+    env_file: .env
+    logging:
+      driver: journald
+      options:
+        tag: mailu-admin
+    volumes:
+      - "$ROOT/data:/data"
+      - "$ROOT/dkim:/dkim"
+    depends_on:
+      - mailu-redis
+
+  mailu-webmail:
+    image: mailu/roundcube:master
+    restart: always
+    env_file: .env
+    volumes:
+      - "$ROOT/webmail:/data"
+      - "$ROOT/overrides/$WEBMAIL:/overrides:ro"
+    depends_on:
+      - mailu-imap
+
+  mailu-fetchmail:
+    image: mailu/fetchmail:$VERSION
+    restart: always
+    env_file: .env
+
+  watchdog:
+    image: containrrr/watchtower:latest
+    container_name: watchdog
+    environment:
+      - WATCHTOWER_NOTIFICATIONS=email
+      - WATCHTOWER_NOTIFICATION_EMAIL_FROM=your-email@example.com
+      - WATCHTOWER_NOTIFICATION_EMAIL_TO=recipient-email@example.com
+      - WATCHTOWER_NOTIFICATION_EMAIL_SERVER=smtp.example.com
+      - WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT=587
+      - WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER=your-email@example.com
+      - WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD=your-email-password
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+networks:
+  homelab-internal:
+    ipam:
+      config:
+        - subnet: 192.168.100.0/24
+  homelab-external:
