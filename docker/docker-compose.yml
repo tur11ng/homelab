@@ -163,7 +163,7 @@ services:
       - 192.168.100.2
     volumes:
       - /services/data/portainer:/data
-#      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       homelab-internal:
         ipv4_address: 192.168.100.8
@@ -219,6 +219,27 @@ services:
       - /services/config/cloudflare-ddns/config.json:/config.json:rw
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+
+  whats-up-docker:
+    image: fmartinou/whats-up-docker
+    container_name: whats-up-docker
+    networks:
+      homelab-internal:
+        ipv4_address: 192.168.100.13
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    depends_on:
+      - wireguard
+      - wireguard-ui
+      - nginx-proxy-manager
+      - cloudflare-ddns
+      - unbound
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 1m
       timeout: 10s
       retries: 3
@@ -341,134 +362,95 @@ services:
     volumes:
       - /services/data/geoipupdate:/usr/share/GeoIP
 
-  mailu-front:
-    image: mailu/nginx:master
-    restart: always
-    env_file: .env
-    logging:
-      driver: journald
-      options:
-        tag: mailu-front
-    ports:
-    - "$BIND_ADDRESS4:80:80"
-    - "$BIND_ADDRESS4:443:443"
-    - "$BIND_ADDRESS4:110:110"
-    - "$BIND_ADDRESS4:143:143"
-    - "$BIND_ADDRESS4:993:993"
-    - "$BIND_ADDRESS4:995:995"
-    - "$BIND_ADDRESS4:25:25"
-    - "$BIND_ADDRESS4:465:465"
-    - "$BIND_ADDRESS4:587:587"
-    volumes:
-      - "$ROOT/certs:/certs"
-      - "$ROOT/overrides/nginx:/overrides:ro"
-
-  mailu-redis:
-    image: redis:alpine
-    restart: always
-    volumes:
-      - "/services/data/mailu-redis:/data"
-
-  mailu-imap:
-    image: mailu/dovecot:master
-    restart: always
-    env_file: .env
-    logging:
-      driver: journald
-      options:
-        tag: mailu-imap
-    volumes:
-      - "/services/data/mailu-imap/mail:/mail"
-      - "$ROOT/overrides/dovecot:/overrides:ro"
-    depends_on:
-      - mailu-front
-
-  mailu-smtp:
-    image: mailu/postfix:master
-    restart: always
-    env_file: .env
-    logging:
-      driver: journald
-      options:
-        tag: mailu-smtp
-    volumes:
-      - "$ROOT/mailqueue:/queue"
-      - "$ROOT/overrides/postfix:/overrides:ro"
-    depends_on:
-      - mailu-front
-
-  mailu-antispam:
-    image: mailu/rspamd:master
-    restart: always
-    env_file: .env
-    logging:
-      driver: journald
-      options:
-        tag: mailu-antispam
-    volumes:
-      - "$ROOT/filter:/var/lib/rspamd"
-      - "$ROOT/dkim:/dkim:ro"
-      - "$ROOT/overrides/rspamd:/etc/rspamd/override.d:ro"
-    depends_on:
-      - mailu-front
-
-#  mailu-antivirus:
-#    image: mailu/none:master
+#  mailu-front:
+#    image: mailu/nginx:master
+#    restart: always
+#    env_file: .env
+#    logging:
+#      driver: journald
+#      options:
+#        tag: mailu-front
+#    volumes:
+#      - "$ROOT/certs:/certs"
+#      - "$ROOT/overrides/nginx:/overrides:ro"
+#
+#  mailu-redis:
+#    image: redis:alpine
+#    restart: always
+#    volumes:
+#      - "/services/data/mailu-redis:/data"
+#
+#  mailu-imap:
+#    image: mailu/dovecot:master
+#    restart: always
+#    env_file: .env
+#    logging:
+#      driver: journald
+#      options:
+#        tag: mailu-imap
+#    volumes:
+#      - "/services/data/mailu-imap/mail:/mail"
+#      - "$ROOT/overrides/dovecot:/overrides:ro"
+#    depends_on:
+#      - mailu-front
+#
+#  mailu-smtp:
+#    image: mailu/postfix:master
+#    restart: always
+#    env_file: .env
+#    logging:
+#      driver: journald
+#      options:
+#        tag: mailu-smtp
+#    volumes:
+#      - "$ROOT/mailqueue:/queue"
+#      - "$ROOT/overrides/postfix:/overrides:ro"
+#    depends_on:
+#      - mailu-front
+#
+#  mailu-antispam:
+#    image: mailu/rspamd:master
+#    restart: always
+#    env_file: .env
+#    logging:
+#      driver: journald
+#      options:
+#        tag: mailu-antispam
+#    volumes:
+#      - "$ROOT/filter:/var/lib/rspamd"
+#      - "$ROOT/dkim:/dkim:ro"
+#      - "$ROOT/overrides/rspamd:/etc/rspamd/override.d:ro"
+#    depends_on:
+#      - mailu-front
+#
+#  mailu-admin:
+#    image: mailu/admin:master
+#    restart: always
+#    env_file: .env
+#    logging:
+#      driver: journald
+#      options:
+#        tag: mailu-admin
+#    volumes:
+#      - "/services/data/mailu-admin/data:/data"
+#      - "/services/data/mailu-admin/dkim:/dkim"
+#    depends_on:
+#      - mailu-redis
+#
+#  mailu-webmail:
+#    image: mailu/roundcube:master
 #    restart: always
 #    env_file: .env
 #    volumes:
-#      - "$ROOT/filter:/data"
-
-#  mailu-webdav:
-#    image: mailu/none:master
+#      - "/services/data/mailu-webmail:/data"
+#      - "$ROOT/overrides/$WEBMAIL:/overrides:ro"
+#    depends_on:
+#      - mailu-imap
+#
+#  mailu-fetchmail:
+#    image: mailu/fetchmail:master
 #    restart: always
 #    env_file: .env
-#    volumes:
-#      - "$ROOT/dav:/data"
-
-  mailu-admin:
-    image: mailu/admin:master
-    restart: always
-    env_file: .env
-    logging:
-      driver: journald
-      options:
-        tag: mailu-admin
-    volumes:
-      - "$ROOT/data:/data"
-      - "$ROOT/dkim:/dkim"
-    depends_on:
-      - mailu-redis
-
-  mailu-webmail:
-    image: mailu/roundcube:master
-    restart: always
-    env_file: .env
-    volumes:
-      - "$ROOT/webmail:/data"
-      - "$ROOT/overrides/$WEBMAIL:/overrides:ro"
-    depends_on:
-      - mailu-imap
-
-  mailu-fetchmail:
-    image: mailu/fetchmail:$VERSION
-    restart: always
-    env_file: .env
-
-  watchdog:
-    image: containrrr/watchtower:latest
-    container_name: watchdog
-    environment:
-      - WATCHTOWER_NOTIFICATIONS=email
-      - WATCHTOWER_NOTIFICATION_EMAIL_FROM=your-email@example.com
-      - WATCHTOWER_NOTIFICATION_EMAIL_TO=recipient-email@example.com
-      - WATCHTOWER_NOTIFICATION_EMAIL_SERVER=smtp.example.com
-      - WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT=587
-      - WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER=your-email@example.com
-      - WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD=your-email-password
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    restart: unless-stopped
 
 networks:
   homelab-internal:
